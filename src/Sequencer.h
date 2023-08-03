@@ -133,6 +133,10 @@ void sequencer_tick_clock() {
       sequencer_trigger_note();
     }
   } 
+
+  if ((sequencer_clock % (sequencer_divider/2)) == 0) {
+    random_offset_led = random(SEQUENCER_NUM_STEPS);
+  }
   sequencer_clock++;
 }
 
