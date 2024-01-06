@@ -10,11 +10,16 @@
 const uint8_t SEQUENCER_NUM_STEPS = 8;
 
 //Initial sequencer values
-uint8_t step_note[] = { 1,0,6,9,0,4,0,5 };
-uint8_t step_enable[] = { 1,0,1,1,1,1,0,1 };
-uint8_t step_velocity[] = { 100,100,100,100,100,100,100,100 };
-uint8_t step_delay[] = { 0,0,0,0,0,0,0,0 };
-uint8_t step_random[] = { 0,0,0,0,0,0,0,0 };
+uint8_t step_note_array[SEQUENCER_NUM_STEPS * 10] = { 1,0,6,9,0,4,0,5 };
+uint8_t step_enable_array[SEQUENCER_NUM_STEPS * 10] = { 1,0,1,1,1,1,0,1 };
+uint8_t step_velocity_array[SEQUENCER_NUM_STEPS * 10] = { 100,100,100,100,100,100,100,100 };
+uint8_t step_delay_array[SEQUENCER_NUM_STEPS * 10] = { 0,0,0,0,0,0,0,0 };
+uint8_t step_random_array[SEQUENCER_NUM_STEPS * 10] = { 0,0,0,0,0,0,0,0 };
+uint8_t* step_note = &step_note_array[0];
+uint8_t* step_enable = &step_enable_array[0];
+uint8_t* step_velocity = &step_velocity_array[0];
+uint8_t* step_delay = &step_delay_array[0];
+uint8_t* step_random = &step_random_array[0];
 uint8_t num_steps_used = SEQUENCER_NUM_STEPS;
 
 void sequencer_init();
@@ -46,8 +51,12 @@ bool double_speed = false;
 
 void sequencer_init() {
   note_stack.Init();
-  for(int i = 0; i < SEQUENCER_NUM_STEPS; i++) {
-    step_note[i] = SCALE[random(9)];
+  for(int i = 0; i < SEQUENCER_NUM_STEPS * 10; i++) {
+    step_note_array[i] = SCALE[random(9)];
+    step_enable_array[i] = step_enable_array[i%8];
+    step_velocity_array[i] = step_velocity_array[i%8];
+    step_delay_array[i] = step_delay_array[i%8];
+    step_random_array[i] = step_random_array[i%8];
   }
   tempo_handler.setHandleTempoEvent(sequencer_tick_clock);
   tempo_handler.setHandleAlignEvent(sequencer_align_clock);
@@ -228,6 +237,23 @@ static void sequencer_untrigger_note() {
   note_off_time = millis() + tempo_interval - gate_length_msec; // Set note off time to sometime in the future
 }
 
+static void sequencer_set_alternative(uint8_t n) {
+  step_note = &step_note_array[SEQUENCER_NUM_STEPS * n];
+  step_enable = &step_enable_array[SEQUENCER_NUM_STEPS * n];
+  step_velocity = &step_velocity_array[SEQUENCER_NUM_STEPS * n];
+  step_delay = &step_delay_array[SEQUENCER_NUM_STEPS * n];
+  step_random = &step_random_array[SEQUENCER_NUM_STEPS * n];
+}
+
+static void sequencer_copy_alternative(uint8_t n) {
+  for(int i = 0; i < SEQUENCER_NUM_STEPS; i++) {
+    step_note_array[i + SEQUENCER_NUM_STEPS * n] = step_note[i];
+    step_enable_array[i + SEQUENCER_NUM_STEPS * n] = step_enable[i];
+    step_velocity_array[i + SEQUENCER_NUM_STEPS * n] = step_velocity[i];
+    step_delay_array[i + SEQUENCER_NUM_STEPS * n] = step_delay[i];
+    step_random_array[i + SEQUENCER_NUM_STEPS * n] = step_random[i];
+  }
+}
 
 void keyboard_set_note(uint8_t note) {
   note_stack.NoteOn(note, INITIAL_VELOCITY);

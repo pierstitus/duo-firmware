@@ -64,6 +64,7 @@ bool note_is_triggered = false;
 int transpose = 0;
 int key_down = 0;
 int key_up = 0;
+int key_start = 0;
 uint8_t key_note[10] = { 0 };
 uint8_t stepkeys = 0;
 bool next_step_is_random = false;
@@ -271,6 +272,9 @@ void keys_scan() {
                     midi_set_channel((k - KEYB_0) + 1);
                   } else if (key_down && key_up) {
                     transpose = SCALE[k - KEYB_0] - 61;
+                  } else if (key_start) {
+                    // sequencer_set_alternative(k - KEYB_0);
+                    if (key_start == 1) {key_start = 3;}
                   } else {
                     key_note[k - KEYB_0] = SCALE[k - KEYB_0] - (key_down&1) + (key_up&1);
                     keyboard_set_note(key_note[k - KEYB_0]);
@@ -329,13 +333,19 @@ void keys_scan() {
                     random_flag = true;
                   }
                 } else if (k == SEQ_START) {
-                  sequencer_toggle_start();
+                  key_start = 1;
                 }
                 break;
             case HOLD:
                 if (k <= KEYB_9 && k >= KEYB_0) {
-                  if(in_setup) {
+                  if (in_setup) {
                     midi_set_channel((k - KEYB_0) + 1);
+                  } else if (key_start) {
+                    // copy current sequence to chosen sequence
+                    sequencer_copy_alternative(k - KEYB_0);
+                    // blink keyboard color white to show action
+                    physical_leds[k - KEYB_0 + 9] = LED_WHITE;
+                    FastLED.show();
                   }
                 } else if (k <= STEP_8 && k >= STEP_1) {
                   // skip step
@@ -350,15 +360,18 @@ void keys_scan() {
                     }
                   }
                 } else if (k == SEQ_START) {
-                  #ifdef DEV_MODE
-                    sequencer_stop();
-                    FastLED.clear();
-                    physical_leds[0] = CRGB::Blue;
-                    FastLED.show();
-                    dfu_flag = 1;                  
-                  #else
-                    power_off();
-                  #endif
+                  if (key_up == 1 && key_down == 1) {
+                    // power off or bootloader on long press on start while up and down are pressed
+                    #ifdef DEV_MODE
+                      sequencer_stop();
+                      FastLED.clear();
+                      physical_leds[0] = CRGB::Blue;
+                      FastLED.show();
+                      dfu_flag = 1;
+                    #else
+                      power_off();
+                    #endif
+                  }
                 } 
                 #ifdef DEV_MODE
                   if (k == BTN_UP) {
@@ -368,7 +381,14 @@ void keys_scan() {
                 break;
             case RELEASED:
                 if (k <= KEYB_9 && k >= KEYB_0) {
-                  keyboard_unset_note(key_note[k - KEYB_0]);
+                  if (key_start) {
+                    sequencer_set_alternative(k - KEYB_0);
+                    // reset keyboard color
+                    physical_leds[k - KEYB_0 + 9] = COLORS[SCALE[k - KEYB_0]%24];
+                    FastLED.show();
+                  } else {
+                    keyboard_unset_note(key_note[k - KEYB_0]);
+                  }
                 } else if (k <= STEP_8 && k >= STEP_1) {
                   stepkeys &= ~(1<<(k-STEP_1));
                 } else if (k == BTN_SEQ2) {
@@ -389,11 +409,15 @@ void keys_scan() {
                   next_step_is_random = false;
                   random_flag = false;
                 } else if (k == SEQ_START) {
+                  if (key_start == 1) {
                   #ifdef DEV_MODE
                     if(dfu_flag == 1) {
                       enter_dfu();
                     }
                   #endif
+                    sequencer_toggle_start();
+                  }
+                  key_start = 0;
                 }
                 break;
             case IDLE:
